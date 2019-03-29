@@ -1,0 +1,46 @@
+---
+title: "russian_literature"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+#devtools::install_github(repo = 'mlampros/fuzzywuzzyR')
+library(fuzzywuzzyR)
+library(readr)
+setwd("~/Downloads/")
+firstprints = read_csv("firstprints_byauthor.csv")
+our_data = read_csv("our_data.csv")
+library(stringr)
+firstprints$lastname = str_replace_all(firstprints$lastname, fixed(" "), "")
+firstprints$title_author = paste(firstprints$title, " ", firstprints$lastname)
+
+our_data$lastname = str_split_fixed(our_data$Автор, " ", 2)[,2]
+our_data$title_author = paste(our_data$Произведение, " ", our_data$lastname)
+
+df = data.frame(matches = rep(NA, nrow(our_data)), title_author = rep(NA, nrow(our_data)))
+i = 0
+for (name in our_data$title_author){
+  i = i + 1
+  df$title_author[i] = name
+  #можно поставить катофф выше
+  match = GetCloseMatches(name, firstprints$title_author, n=1, cutoff = 0.5)
+  if (length(match)>0) {
+    df$matches[i] = match
+  } else {
+    df$matches[i] = "not found"
+  }
+}
+
+our_data_meta = inner_join(our_data, df, by="title_author")
+colnames(firstprints)[14] = "matches"
+our_data_meta = left_join(our_data_meta, firstprints, by="matches")
+
+#проставляю NA в строках с дополнительной информацией, которая сопоставилась неверно, но лучше все же поставить cutoff повыше
+for ( i in c(21, 34, 65, 80, 126, 133, 141, 151, 154, 179, 188, 190, 203, 238, 245, 247, 262, 288, 291, 292, 327, 332, 337)) {
+  our_data_meta[i, 6:ncol(our_data_meta)] = NA
+}
+
+fin_our_data_meta = our_data_meta[, c(1:3, 9:17)]
+write.csv(fin_our_data_meta, "~/Downloads/matched_data.csv", row.names = FALSE)
+```
+
